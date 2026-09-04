@@ -25,7 +25,7 @@ The current implementation demonstrates a narrow, credible runtime path:
 3. Build a runtime context for a task
 4. Execute a task through the task runner and action executor
 5. Invoke a typed tool
-6. Persist lightweight in-memory task history
+6. Persist task history in memory or a local JSON file
 7. Emit runtime events and structured log entries
 
 This gives contributors a working reference path without locking the project
@@ -37,7 +37,7 @@ The following areas are scaffolded with interfaces, types, or placeholders and
 are expected to become contributor work:
 
 - Wallet-aware and payment-aware actions
-- Persistent memory and state backends
+- Production-grade persistent memory and state backends
 - Model provider integrations (an `OpenAICompatibleModelProvider` scaffold is available for experimentation; note that it is scaffolded and intentionally not production-complete)
 - Runtime policy engines and approval flows
 - Long-running orchestration and scheduling
@@ -55,7 +55,7 @@ src/
   events/      Runtime event model and event bus
   guards/      Runtime assertions and guardrails
   logger/      Structured logger abstraction
-  memory/      In-memory store plus storage interface
+  memory/      In-memory and JSON-file stores plus storage interface
   providers/   Model/provider abstraction layer
   runtime/     Bootstrap, context, and runtime composition
   state/       Runtime state interface
@@ -101,6 +101,41 @@ const result = await runtime.executeTask({
 
 console.log(result.output);
 ```
+
+## Durable task history
+
+Set `memoryStoragePath` to persist task history to a local JSON file. When no
+custom `memoryStore` is supplied, the runtime creates a `JsonFileMemoryStore`
+for that path.
+
+```ts
+import { AgentRuntime } from "@lily-protocol/agentlily-runtime";
+
+const runtime = new AgentRuntime({
+  runtimeId: "local-dev",
+  memoryStoragePath: "./data/task-history.json"
+});
+```
+
+The file contains a JSON array of `MemoryEntry` objects. Each entry has the
+following shape:
+
+```json
+{
+  "agentId": "agent-demo",
+  "taskId": "task-001",
+  "input": "Send a greeting",
+  "output": { "echoed": "hello lily" },
+  "recordedAt": "2026-09-04T00:00:00.000Z"
+}
+```
+
+`JsonFileMemoryStore` is intended as a simple local durable backend rather than
+a production database. It currently keeps the file contents in memory and
+rewrites the full JSON array on each append. It also has no global or per-agent
+capacity limit, and multiple writers targeting the same path can overwrite one
+another. Use a single writer for a given file and choose a purpose-built storage
+backend when stronger concurrency or retention guarantees are required.
 
 ## Scripts
 
